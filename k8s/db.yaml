@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-api
+spec:
+  selector:
+    app: mysql-api
+  ports:
+  - port: 3306
+    targetPort: 3306
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-schema
+data:
+  schema.sql: |
+    CREATE SCHEMA IF NOT EXISTS `hurb_test_assignment`
+    DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+    CREATE TABLE IF NOT EXISTS `hurb_test_assignment`.`product` (
+    `product_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `title` VARCHAR(32) NOT NULL,
+    `sku` VARCHAR(32) NOT NULL,
+    `description` VARCHAR(1024) NULL,
+    `price` DECIMAL(12,2)NOT NULL DEFAULT 0.00,
+    `created` DATETIME NOT NULL,
+    `last_updated` DATETIME NULL,
+    PRIMARY KEY (`product_id`),
+    UNIQUE INDEX (`sku` ASC),
+    INDEX (
+    `created`
+    ),
+    INDEX (`last_updated`)
+    );
+
+    CREATE TABLE IF NOT EXISTS `hurb_test_assignment`.`product_barcode` (
+    `product_id` INT UNSIGNED NOT NULL,
+    `barcode` VARCHAR(32) NOT NULL,
+    PRIMARY KEY (`product_id`, `barcode`),
+    UNIQUE INDEX (`barcode`)
+    );
+
+    CREATE TABLE IF NOT EXISTS `hurb_test_assignment`.`product_attribute` (
+    `product_id` INT UNSIGNED NOT NULL,
+    `name` VARCHAR(16) NOT NULL,
+    `value` VARCHAR(32) NOT NULL,
+    PRIMARY KEY (`product_id`, `name`)
+    );
+
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql-api
+spec:
+  selector:
+    matchLabels:
+      app: mysql-api
+  serviceName: mysql-api
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mysql-api
+    spec:
+      containers:
+      - name: mysql-api
+        image: mysql:5.7
+        env:
+          - name: MYSQL_ROOT_PASSWORD
+            value: "D&lt@Challenge"
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+          - name: mysql-schema
+            mountPath: /docker-entrypoint-initdb.d
+            
+        #lifecycle:
+        #  postStart:
+        #    exec:
+        #      command: ["mysql", "-u", "root", "-p", "$(MYSQL_ROOT_PASSWORD)", "< /schema/schema.db"]
+      volumes:
+        - name: mysql-schema
+          configMap:
+            name: mysql-schema
+            items:
+              - key: "schema.sql"
+                path: "schema.sql"
